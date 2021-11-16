@@ -1,0 +1,138 @@
+---
+title: "Lab 8"
+author: "Mari Herbst"
+date: "11/16/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(modelsummary)
+library(corrplot)
+library(broom)
+library(here)
+```
+
+### Read in slo_homes.csv
+
+```{r}
+homes <- read_csv(here("data", "slo_homes.csv"))
+```
+
+### Create a subset with 4 cities
+
+Task: create a subset called homes_subset that only contains observations where the city is:
+
+- "San Luis Obispo"
+- "Atascadero"
+- "Arroyo Grande"
+- "Santa Maria-Orcutt"
+
+```{r}
+homes_subset <- homes %>%
+  filter(City %in% c("San Luis Obispo", "Atascadero", "Arroyo Grande", "Santa Maria-Orcutt"))
+```
+
+### A little exploration
+
+Task: create a summary table that has the mean and standard deviation of home prices grouped by city and sale status using homes_subset
+
+*{eval = FALSE} means code will not even be run. {include = FALSE} means code will be run but won't show up in knitted version*
+
+```{r}
+homes_subset %>%
+  group_by(City, Status) %>%
+  summarize(price_mean = mean(Price),
+            price_sd = sd(Price))
+```
+
+Task: explore the relationship between square footage and home price (from home_subset) in a scatterplot
+
+- positive linear relationship between square footage and home price
+
+```{r}
+ggplot(data = homes_subset, aes(x = SqFt, y = Price)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+### Try a few linear models
+
+Use multiple linear regression to investigate relationships between several predictor variables and home price
+
+Create different versions of this model:
+
+1. Price ~ City, Bedrooms, Bathrooms, SqFt, Status (lm1)
+2. Price ~ City, SqFt, Status (lm2)
+3. dealer's choice (lm3)
+
+```{r}
+lm1 <- lm(Price ~ City + Bedrooms + Bathrooms + SqFt + Status, data = homes_subset)
+
+lm2 <- lm(Price ~ City + SqFt + Status, data = homes_subset)
+
+lm3 <- lm(Price ~ City + Bedrooms + Bathrooms, data = homes_subset)
+
+# If I wanted San Luis Obispo to be the reference level, use fct_relevel to specify a new reference level
+new_homes_subset <- homes_subset %>%
+  mutate(City = fct_relevel(City, "San Luis Obispo"))
+
+# This will use SLO as the reference level for city
+lm_slo <- lm(Price ~ City + SqFt, data = new_homes_subset)
+```
+
+R$^2$ = how much of variance in dependent variable is predicted by this model
+
+### Explore correlations between quantitative variables
+
+Task: make a subset called homes_quant (starting from homes_subset) that only contains the variables from Price through SqFt
+
+```{r}
+homes_quant <- homes_subset %>%
+  select(Price:SqFt)
+
+homes_cor <- cor(homes_quant)
+
+corrplot(homes_cor, method = "ellipse") # use method = to change how correlation is visualized
+```
+
+### Compare AIC values
+
+AIC: compares model fit vs complexity. lower AIC indicates a better balance
+
+```{r}
+AIC(lm1)
+AIC(lm2)
+```
+
+### Use modelsummary() to return multiple model outputs
+
+```{r}
+modelsummary(list(lm1, lm2, lm3))
+```
+
+### Check out diagnostic plots for lm1
+
+```{r}
+plot(lm1)
+```
+
+Cook's distance > 1 means a data point is pulling disproportionately
+
+### Use broom::augment() to return the predictions for existing observations
+
+".fitted" column indicates the price our model would predict the price to be
+
+```{r}
+home_predictions <- augment(lm1)
+```
+
+### Make a histogram of the residuals from this model (lm1)
+
+```{r}
+ggplot(data = home_predictions, aes(x = .resid)) +
+         geom_histogram()
+```
+
