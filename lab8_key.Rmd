@@ -133,6 +133,6 @@ home_predictions <- augment(lm1)
 
 ```{r}
 ggplot(data = home_predictions, aes(x = .resid)) +
-         geom_histogram()
+  geom_histogram()
 ```
 
